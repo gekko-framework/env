@@ -11,11 +11,28 @@ class Env
     /**
      * @var string?
      */
-    private static $rootDir;
+    private static $root_directory;
 
-    public static function rootDir() : ?string 
+    public static function getRootDirectory() : ?string 
     {
-        return self::$rootDir;
+        return self::$root_directory;
+    }
+
+    public static function toLocalPath(string $path) : string 
+    {
+        $local_path = self::$root_directory;
+
+        if (strlen($local_path) > 0 && $local_path[strlen($local_path)-1] != DIRECTORY_SEPARATOR)
+            $local_path .= DIRECTORY_SEPARATOR;
+
+        $path = \str_replace("/", DIRECTORY_SEPARATOR, $path);
+        $path = \str_replace("\\", DIRECTORY_SEPARATOR, $path);
+
+        $local_path .= $path;
+
+        $local_path = \str_replace(DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR, $local_path);
+
+        return $local_path;
     }
 
     /**
@@ -24,11 +41,11 @@ class Env
      *
      * @return void
      */
-    public static function init(string $rootDir) : void
+    public static function init(string $root_directory) : void
     {
-        self::$rootDir = $rootDir;
+        self::$root_directory = $root_directory;
 
-        $envfile = $rootDir . DIRECTORY_SEPARATOR . ".env";
+        $envfile = $root_directory . DIRECTORY_SEPARATOR . ".env";
 
         if (!file_exists($envfile))
             return;
@@ -36,6 +53,18 @@ class Env
         $envs = parse_ini_file($envfile);
         foreach ($envs as $var => $value)
             self::put($var, $value);
+
+        $config_path = Env::toLocalPath(Env::get("config.path") ?? "config");
+        $config_provider = new \Gekko\Config\ConfigProvider(Env::get("config.driver") ?? "php", Env::get("config.env"), $config_path);
+
+        $env_config = $config_provider->getConfig("env");
+        $envs = $env_config->getKeys();
+
+        if (!empty($envs))
+        {
+            foreach ($envs as $key)
+                self::put($key, $env_config->get($key) ?? "");
+        }
     }
 
     /**
